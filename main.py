@@ -1,114 +1,84 @@
 import os
 import discord
-from discord import app_commands
 from discord.ext import commands
 
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-
-if not DISCORD_TOKEN:
-    raise ValueError("خطأ: لم يتم العثور على متغير البيئة DISCORD_TOKEN.")
-
+# 1. إعدادات البوت والصلاحيات (Intents)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
-intents.members = True
-intents.moderation = True
+intents.members = True  # مهم جداً لجلب الأعضاء وإرسال الرسائل الخاصة لهم
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# تحديد آيدي سيرفرك حصرياً لتسجيل أوامر السلاش عليه
-MY_GUILD_ID = discord.Object(id=1527790414751338731)
-
-# ==========================================
-# أنظمة الحماية الصارمة (Anti-Exploit & Security)
-# ==========================================
-
-@bot.event
-async def on_member_join(member):
-    if member.bot:
-        async for entry in member.guild.audit_logs(limit=1, action=discord.AuditLogAction.bot_add):
-            if entry.target.id == member.id:
-                adder = entry.user
-                try:
-                    await member.edit(roles=[], reason="حماية السيرفر: ممنوع دخول بوتات خارجية")
-                except:
-                    pass
-                if adder and not adder.bot:
-                    try:
-                        guild_adder = member.guild.get_member(adder.id)
-                        if guild_adder:
-                            await guild_adder.edit(roles=[], reason="حماية السيرفر: قام بإضافة بوت خارجي")
-                    except:
-                        pass
-
-@bot.event
-async def on_guild_channel_delete(channel):
-    async for entry in channel.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_delete):
-        if entry.user and not entry.user.bot:
-            user = channel.guild.get_member(entry.user.id)
-            if user:
-                try:
-                    await user.edit(roles=[], reason="حماية السيرفر: قام بحذف روم")
-                except:
-                    pass
-            break
-
-@bot.event
-async def on_member_update(before, after):
-    if len(after.roles) > len(before.roles):
-        async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
-            if entry.target.id == after.id and entry.user and not entry.user.bot:
-                added_roles = [r for r in after.roles if r not in before.roles]
-                if len(added_roles) > 3:
-                    granter = after.guild.get_member(entry.user.id)
-                    if granter:
-                        try:
-                            await granter.edit(roles=[], reason="حماية السيرفر: أعطى أكثر من 3 رولات دفعة واحدة")
-                        except:
-                            pass
-                break
-
+# أيدي السيرفر الخاص بك للمزامنة الفورية لأوامر السلاش
+GUILD_ID = discord.Object(id=1527790414751338731)
 
 @bot.event
 async def on_ready():
+    print(f"تم تسجيل الدخول بنجاح باسم: {bot.user} (ID: {bot.user.id})")
+    
     try:
-        bot.tree.copy_global_to(guild=MY_GUILD_ID)
-        synced = await bot.tree.sync(guild=MY_GUILD_ID)
-        print(f"Synced {len(synced)} slash commands to guild successfully.")
+        bot.tree.copy_global_to(guild=GUILD_ID)
+        await bot.tree.sync(guild=GUILD_ID)
+        print("تمت مزامنة أوامر السلاش (Slash Commands) مع السيرفر بنجاح!")
     except Exception as e:
-        print(f"Failed to sync slash commands: {e}")
-    print(f'Logged in as {bot.user} successfully, N7Z-Bot is online!')
+        print(f"حدث خطأ أثناء مزامنة الأوامر: {e}")
 
+# ==========================================
+# أمثلة الأوامر وأمر البرودكاست (Broadcast)
+# ==========================================
 
-def check_admin_or_streamer(interaction: discord.Interaction) -> bool:
-    is_admin = interaction.user.guild_permissions.administrator
-    has_streamer_role = any(role.name.lower() in ["streamer", "ستريمر"] for role in interaction.user.roles)
-    return is_admin or has_streamer_role
+@bot.tree.command(name="ping", description="فحص سرعة استجابة البوت")
+async def ping(interaction: discord.Interaction):
+    latency = round(bot.latency * 1000)
+    await interaction.response.send_message(f"🏓 البوت شغال وسريع! البينغ: `{latency}ms`", ephemeral=True)
 
-
-# أمر البرودكاست في الخاص مع منشن في النهاية
-@bot.tree.command(name="broadcast", description="إرسال برودكاست لجميع الأعضاء بالخاص مع منشن في النهاية")
-@app_commands.describe(message="نص الرسالة المراد إرسالها للجميع بالخاص")
+@bot.tree.command(name="broadcast", description="إرسال رسالة برودكاست عامة مع منشن وفي الخاص للأعضاء")
 async def broadcast(interaction: discord.Interaction, message: str):
-    if not check_admin_or_streamer(interaction):
-        await interaction.response.send_message("❌ عذراً، أمر البرودكاست مخصص فقط لحاملي رتبة **Streamer** أو الإدارة!", ephemeral=True)
+    # التحقق مما إذا كان المستخدم يملك صلاحية الأدمن أو الإدارة
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص للإداريين فقط!", ephemeral=True)
         return
 
-    await interaction.response.send_message("⏳ جاري إرسال البرودكاست لجميع أعضاء السيرفر بالخاص...", ephemeral=True)
+    # الرد السريع لكي لا تنتهي مهلة التفاعل (Interaction)
+    await interaction.response.send_message("⏳ جاري تنفيذ البرودكاست وإرسال الرسائل...", ephemeral=True)
 
     success_count = 0
     fail_count = 0
 
+    # 1. إرسال الرسالة في الشات العام مع منشن لجميع الأعضاء في آخرها
+    public_channel = interaction.channel
+    if public_channel:
+        # إضافة منشن لجميع الأعضاء أو استخدام @everyone
+        public_text = f"{message}\n\n@everyone"
+        await public_channel.send(public_text)
+
+    # 2. إرسال الرسالة في الخاص (DM) لكل عضو في السيرفر
     for member in interaction.guild.members:
         if member.bot:
-            continue
+            continue  # تخطي البوتات
         try:
-            dm_text = f"{message}\n\n{member.mention}"
-            await member.send(dm_text)
+            await member.send(f"📬 **برودكاست إداري من سيرفر {interaction.guild.name}:**\n\n{message}")
             success_count += 1
         except Exception:
-            fail_count += 1
+            fail_count += 1  # في حال كان العضو مقفل الخاص (DMs)
 
-    await interaction.followup.send(f"✅ تم إرسال البرودكاست بنجاح!\n📤 تم الإرسال إلى: `{success_count}` عضو\n❌ فشل الإرسال (مغلق الخاص): `{fail_count}` عضو", ephemeral=True)
+    # إرسال تقرير نهائي للإداري الذي نفذ الأمر
+    try:
+        await interaction.followup.send(
+            f"✅ **تم الانتهاء من البرودكاست بنجاح!**\n"
+            f"• تم الإرسال للعام مع المنشن.\n"
+            f"• تم إرسالها بالخاص لـ **{success_count}** عضو.\n"
+            f"• تعذر الإرسال لـ **{fail_count}** عضو (بسبب إغلاق الخاص).",
+            ephemeral=True
+        )
+    except Exception:
+        pass
 
-bot.run(DISCORD_TOKEN)
+# تشغيل البوت باستخدام التوكن من بيئة العمل (Railway Variables)
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+if not TOKEN:
+    print("خطأ: لم يتم العثور على DISCORD_TOKEN في المتغيرات البيئية!")
+else:
+    bot.run(TOKEN)
