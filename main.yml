@@ -1,0 +1,22 @@
+import os
+import discord
+
+# جلب التوكن من متغيرات البيئة في رايلواي
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+# التحقق من أن التوكن موجود وليست قيمته فارغة
+if not TOKEN:
+    raise ValueError("خطأ: لم يتم العثور على متغير البيئة DISCORD_TOKEN. تأكد من إضافته في إعدادات المنصة.")
+
+# إعداد الصلاحيات (Intents) الأساسية للبوت
+intents = discord.Intents.default()
+intents.message_content = True
+
+client = discord.Client(intents=intents)
+
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user} successfully!')
+
+# تشغيل البوت بالتوكن
+client.run(TOKEN)
