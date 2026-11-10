@@ -16,11 +16,16 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# أيدي السيرفر المخصص لتسجيل ومزامنة أوامر السلاش فوراً
+GUILD_ID = discord.Object(id=1569733011501617182)
+
 @bot.event
 async def on_ready():
     try:
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} slash commands successfully.")
+        # نسخ ومزامنة الأوامر خصيصاً على السيرفر الخاص بك
+        bot.tree.copy_global_to(guild=GUILD_ID)
+        synced = await bot.tree.sync(guild=GUILD_ID)
+        print(f"Synced {len(synced)} slash commands successfully to guild {GUILD_ID.id}.")
     except Exception as e:
         print(f"Failed to sync slash commands: {e}")
     print(f'Logged in as {bot.user} successfully, N7Z-Bot is online with Strict Security!')
@@ -44,12 +49,11 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # 1. نظام الحماية من الروابط (منع الروابط والإعلانات والتخريب)
+    # منع الروابط والإعلانات والدعوات الخبيثة
     if "http://" in message.content or "https://" in message.content or "discord.gg/" in message.content:
         try:
             await message.delete()
             warning_msg = await message.channel.send(f"⚠️ {message.author.mention}, ممنوع إرسال الروابط أو الدعوات هنا!")
-            # حذف رسالة التحذير بعد 5 ثوانٍ لتنظيف الشات
             await warning_msg.delete(delay=5)
         except Exception as e:
             print(f"Error handling link deletion: {e}")
@@ -57,7 +61,6 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# حماية إضافية لمراقبة حذف القنوات أو الرتب (تنبيه)
 @bot.event
 async def on_guild_channel_delete(channel):
     print(f"⚠️ تنبيه أمني: تم حذف قناة {channel.name}")
@@ -71,24 +74,21 @@ async def on_guild_role_delete(role):
 # أوامر السلاش (Slash Commands)
 # ==========================================
 
-# 1. أمر البينغ (/ping)
 @bot.tree.command(name="ping", description="فحص سرعة استجابة البوت")
 async def ping(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
     await interaction.response.send_message(f"🏓 البوت شغال وسريع وأمانه عالي! البينغ: `{latency}ms`", ephemeral=True)
 
-# 2. أمر الحماية (/security)
 @bot.tree.command(name="security", description="حالة نظام الحماية والأمان الصارم في البوت")
 async def security(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🛡️ نظام الحماية الصارم نشط (Active)",
-        description="• **منع الروابط والإعلانات:** مفعل تلقائياً.\n• **حماية السيرفر:** مراقبة حذف القنوات والرتب.\n• **حماية الأعضاء:** مؤمن بالكامل.",
+        description="• **منع الروابط والإعلانات:** مفعل تلقائياً.\n• **حماية السيرفر:** مراقبة الحذف والتخريب.\n• **حماية الأعضاء:** مؤمن بالكامل.",
         color=discord.Color.green()
     )
     embed.set_footer(text="N7Z-Bot Security System")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# 3. أمر البرودكاست (/broadcast)
 @bot.tree.command(name="broadcast", description="إرسال برودكاست لجميع الأعضاء بالخاص مع منشن في النهاية")
 @app_commands.describe(message="نص الرسالة المراد إرسالها للجميع بالخاص")
 async def broadcast(interaction: discord.Interaction, message: str):
