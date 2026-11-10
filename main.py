@@ -1,6 +1,5 @@
 import os
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 # جلب التوكن من بيئة العمل في رايلواي
@@ -14,25 +13,16 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
+# استخدام بادئة التعجب (!) للأوامر العادية
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-# أيدي السيرفر المخصص لتسجيل ومزامنة أوامر السلاش فوراً
-GUILD_ID = discord.Object(id=1569733011501617182)
 
 @bot.event
 async def on_ready():
-    try:
-        # نسخ ومزامنة الأوامر خصيصاً على السيرفر الخاص بك
-        bot.tree.copy_global_to(guild=GUILD_ID)
-        synced = await bot.tree.sync(guild=GUILD_ID)
-        print(f"Synced {len(synced)} slash commands successfully to guild {GUILD_ID.id}.")
-    except Exception as e:
-        print(f"Failed to sync slash commands: {e}")
-    print(f'Logged in as {bot.user} successfully, N7Z-Bot is online with Strict Security!')
+    print(f'Logged in as {bot.user} successfully, N7Z-Bot is online with Prefix Commands & Strict Security!')
 
-def check_admin_or_streamer(interaction: discord.Interaction) -> bool:
-    is_admin = interaction.user.guild_permissions.administrator
-    has_streamer_role = any(role.name.lower() in ["streamer", "ستريمر"] for role in interaction.user.roles)
+def check_admin_or_streamer(ctx) -> bool:
+    is_admin = ctx.author.guild_permissions.administrator
+    has_streamer_role = any(role.name.lower() in ["streamer", "ستريمر"] for role in ctx.author.roles)
     return is_admin or has_streamer_role
 
 # ==========================================
@@ -71,37 +61,43 @@ async def on_guild_role_delete(role):
 
 
 # ==========================================
-# أوامر السلاش (Slash Commands)
+# الأوامر العادية (Prefix Commands)
 # ==========================================
 
-@bot.tree.command(name="ping", description="فحص سرعة استجابة البوت")
-async def ping(interaction: discord.Interaction):
+# 1. أمر البينغ (!ping)
+@bot.command(name="ping", help="فحص سرعة استجابة البوت")
+async def ping(ctx):
     latency = round(bot.latency * 1000)
-    await interaction.response.send_message(f"🏓 البوت شغال وسريع وأمانه عالي! البينغ: `{latency}ms`", ephemeral=True)
+    await ctx.send(f"🏓 البوت شغال وسريع وأمانه عالي! البينغ: `{latency}ms`")
 
-@bot.tree.command(name="security", description="حالة نظام الحماية والأمان الصارم في البوت")
-async def security(interaction: discord.Interaction):
+# 2. أمر الحماية (!security)
+@bot.command(name="security", help="حالة نظام الحماية والأمان الصارم في البوت")
+async def security(ctx):
     embed = discord.Embed(
         title="🛡️ نظام الحماية الصارم نشط (Active)",
         description="• **منع الروابط والإعلانات:** مفعل تلقائياً.\n• **حماية السيرفر:** مراقبة الحذف والتخريب.\n• **حماية الأعضاء:** مؤمن بالكامل.",
         color=discord.Color.green()
     )
     embed.set_footer(text="N7Z-Bot Security System")
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await ctx.send(embed=embed)
 
-@bot.tree.command(name="broadcast", description="إرسال برودكاست لجميع الأعضاء بالخاص مع منشن في النهاية")
-@app_commands.describe(message="نص الرسالة المراد إرسالها للجميع بالخاص")
-async def broadcast(interaction: discord.Interaction, message: str):
-    if not check_admin_or_streamer(interaction):
-        await interaction.response.send_message("❌ عذراً، أمر البرودكاست مخصص فقط لحاملي رتبة **Streamer** أو الإدارة!", ephemeral=True)
+# 3. أمر البرودكاست (!broadcast الرسالة)
+@bot.command(name="broadcast", help="إرسال برودكاست لجميع الأعضاء بالخاص مع منشن في النهاية")
+async def broadcast(ctx, *, message: str = None):
+    if not check_admin_or_streamer(ctx):
+        await ctx.send("❌ عذراً، أمر البرودكاست مخصص فقط لحاملي رتبة **Streamer** أو الإدارة!")
         return
 
-    await interaction.response.send_message("⏳ جاري إرسال البرودكاست لجميع أعضاء السيرفر بالخاص...", ephemeral=True)
+    if not message:
+        await ctx.send("❌ يرجى كتابة الرسالة المراد إرسالها بعد الأمر، مثال: `!broadcast السلام عليكم`")
+        return
+
+    status_msg = await ctx.send("⏳ جاري إرسال البرودكاست لجميع أعضاء السيرفر بالخاص...")
 
     success_count = 0
     fail_count = 0
 
-    for member in interaction.guild.members:
+    for member in ctx.guild.members:
         if member.bot:
             continue
         try:
@@ -111,7 +107,7 @@ async def broadcast(interaction: discord.Interaction, message: str):
         except Exception:
             fail_count += 1
 
-    await interaction.followup.send(f"✅ تم إرسال البرودكاست بنجاح!\n📤 تم الإرسال إلى: `{success_count}` عضو\n❌ فشل الإرسال (مغلق الخاص): `{fail_count}` عضو", ephemeral=True)
+    await status_msg.edit(content=f"✅ تم إرسال البرودكاست بنجاح!\n📤 تم الإرسال إلى: `{success_count}` عضو\n❌ فشل الإرسال (مغلق الخاص): `{fail_count}` عضو")
 
 # تشغيل البوت
 if not DISCORD_TOKEN:
